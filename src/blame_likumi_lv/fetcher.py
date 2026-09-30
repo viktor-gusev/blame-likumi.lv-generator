@@ -70,7 +70,7 @@ def fetch_law(
     today = today or date.today()
     page, _, cached = fetcher.law_page(law)
     metadata = parse_metadata(page, law.url, law.id, law.title, law.type)
-    revisions = discover_revisions(page, law.id, law.url)
+    revisions = discover_revisions(page, law.id, law.url, fallback_effective=metadata.effective)
     usable = [revision for revision in revisions if revision.effective <= today]
     downloaded = 0
     for revision in usable:

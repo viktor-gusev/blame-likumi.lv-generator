@@ -191,7 +191,12 @@ def parse_metadata(source: str, source_url: str, fallback_id: str, fallback_titl
     return metadata
 
 
-def discover_revisions(source: str, law_id: str, page_url: str) -> list[Revision]:
+def discover_revisions(
+    source: str,
+    law_id: str,
+    page_url: str,
+    fallback_effective: date | None = None,
+) -> list[Revision]:
     tree = parse_tree(source)
     containers = _find_class(tree, "redakcija-container")
     if len(containers) > 1:
@@ -245,6 +250,10 @@ def discover_revisions(source: str, law_id: str, page_url: str) -> list[Revision
                 f"UNKNOWN_STRUCTURE: expected one revision selector or #version_date, found {len(version_date_nodes)}"
             )
         effective = parse_lv_date(version_date_nodes[0].attrs.get("data-version_date", ""))
+        # Some international documents are marked as active but expose an
+        # empty version_date.  Their passport still contains the effective
+        # date, and the page itself is the only available current snapshot.
+        effective = effective or fallback_effective
         if effective is None:
             raise UnknownStructureError("UNKNOWN_STRUCTURE: #version_date has no usable date")
         revisions[effective] = Revision(law_id=law_id, effective=effective, url=page_url)
