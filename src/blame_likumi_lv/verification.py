@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 
@@ -40,7 +41,17 @@ def verify_law(law: Law, output: Path, fetcher: RateLimitedFetcher, today: date 
     LOGGER.info("[%s] Verification: PASS (%s)", law.title, current.effective.isoformat())
 
 
-def verify_all(laws: list[Law], output: Path, fetcher: RateLimitedFetcher) -> None:
-    for law in laws:
-        verify_law(law, output, fetcher)
+def verify_all(laws: list[Law], output: Path, fetcher: RateLimitedFetcher, workers: int = 1) -> None:
+    if workers < 1:
+        raise ValueError("workers must be at least 1")
+    if workers == 1:
+        for law in laws:
+            verify_law(law, output, fetcher)
+        return
 
+    def verify_one(law: Law) -> None:
+        worker = RateLimitedFetcher(fetcher.cache_dir, refresh=fetcher.refresh, min_interval=fetcher.min_interval)
+        verify_law(law, output, worker)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(verify_one, laws))

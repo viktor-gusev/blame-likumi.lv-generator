@@ -43,6 +43,19 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(metadata.issuer, "Saeima")
         self.assertEqual(metadata.effective.isoformat(), "2020-01-01")
 
+    def test_parses_noteikumi_metadata(self):
+        noteikumi = FIXTURE.replace("<a>likums</a>", "<a>noteikumi</a>")
+        metadata = parse_metadata(noteikumi, "https://likumi.lv/ta/id/1-noteikumi", "1", "Fallback", "noteikumi")
+        self.assertEqual(metadata.type, "noteikumi")
+
+    def test_discovers_single_current_version_without_selector(self):
+        single = FIXTURE.replace(
+            "<div class='redakcija-container r-container'>\n  <ul>\n    <li><div class='element-data'>{&quot;value&quot;:&quot;01.01.2020&quot;,&quot;iso_value&quot;:&quot;2020/01/01&quot;}</div></li>\n    <li><div class='element-data'>{&quot;value&quot;:&quot;01.02.2020&quot;,&quot;iso_value&quot;:&quot;2020/02/01&quot;}</div></li>\n  </ul>\n</div>",
+            "<div id='version_date' data-version_date='01.02.2020'></div>",
+        )
+        revisions = discover_revisions(single, "1", "https://likumi.lv/ta/id/1-law")
+        self.assertEqual([item.effective.isoformat() for item in revisions], ["2020-02-01"])
+
     def test_missing_body_fails_closed(self):
         with self.assertRaises(UnknownStructureError):
             extract_official_text("<div class='pase-container'></div>")
@@ -50,4 +63,3 @@ class ParserTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

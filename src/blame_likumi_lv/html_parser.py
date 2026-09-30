@@ -14,7 +14,7 @@ from .models import LawMetadata, Revision
 from .normalize import normalize_text
 
 
-_DATE_RE = re.compile(r"(?P<day>\d{1,2})\.(?P<month>\d{1,2})\.(?P<year>\d{4})\.")
+_DATE_RE = re.compile(r"(?P<day>\d{1,2})\.(?P<month>\d{1,2})\.(?P<year>\d{4})\.?")
 _ISO_DATE_RE = re.compile(r"(?P<year>\d{4})[/-](?P<month>\d{1,2})[/-](?P<day>\d{1,2})")
 _BLOCK_TAGS = {"address", "article", "blockquote", "br", "div", "dd", "dl", "dt", "h1", "h2", "h3", "h4", "h5", "h6", "li", "ol", "p", "pre", "section", "table", "td", "th", "tr", "ul"}
 
@@ -171,8 +171,9 @@ def parse_metadata(source: str, source_url: str, fallback_id: str, fallback_titl
     title = value("Nosaukums:") or fallback_title
     issuer = value("Izdevējs:")
     doc_type = (value("Veids:") or fallback_type).lower()
-    if doc_type != "likums":
-        raise UnknownStructureError(f"UNSUPPORTED_TYPE: expected likums, found {doc_type!r}")
+    expected_type = fallback_type.lower()
+    if doc_type != expected_type:
+        raise UnknownStructureError(f"UNSUPPORTED_TYPE: expected {expected_type}, found {doc_type!r}")
 
     published = value("Publicēts:")
     metadata = LawMetadata(
@@ -193,8 +194,8 @@ def parse_metadata(source: str, source_url: str, fallback_id: str, fallback_titl
 def discover_revisions(source: str, law_id: str, page_url: str) -> list[Revision]:
     tree = parse_tree(source)
     containers = _find_class(tree, "redakcija-container")
-    if len(containers) != 1:
-        raise UnknownStructureError(f"UNKNOWN_STRUCTURE: expected one revision selector, found {len(containers)}")
+    if len(containers) > 1:
+        raise UnknownStructureError(f"UNKNOWN_STRUCTURE: expected at most one revision selector, found {len(containers)}")
 
     revisions: dict[date, Revision] = {}
     # The live page creates the visible dropdown with JavaScript, but embeds
@@ -204,7 +205,7 @@ def discover_revisions(source: str, law_id: str, page_url: str) -> list[Revision
     version_nodes = _find_id(tree, "ver_date")
     if len(version_nodes) > 1:
         raise UnknownStructureError(f"UNKNOWN_STRUCTURE: expected one #ver_date, found {len(version_nodes)}")
-    if version_nodes:
+    if version_nodes and html_lib.unescape(version_nodes[0].text_content()).strip():
         raw = html_lib.unescape(version_nodes[0].text_content()).strip()
         try:
             payload = json.loads(raw)
@@ -221,7 +222,7 @@ def discover_revisions(source: str, law_id: str, page_url: str) -> list[Revision
                 raise UnknownStructureError(f"UNKNOWN_STRUCTURE: revision without date: {data!r}")
             revision_url = urljoin(page_url.rstrip("/") + "/", f"redakcijas-datums/{effective:%Y/%m/%d}")
             revisions[effective] = Revision(law_id=law_id, effective=effective, url=revision_url)
-    else:
+    elif containers:
         for node in containers[0].descendants():
             if not node.has_class("element-data"):
                 continue
@@ -235,6 +236,18 @@ def discover_revisions(source: str, law_id: str, page_url: str) -> list[Revision
                 raise UnknownStructureError(f"UNKNOWN_STRUCTURE: revision without date: {raw[:120]!r}")
             revision_url = urljoin(page_url.rstrip("/") + "/", f"redakcijas-datums/{effective:%Y/%m/%d}")
             revisions[effective] = Revision(law_id=law_id, effective=effective, url=revision_url)
+    else:
+        # Newly published acts can have no revision dropdown yet.  Likumi.lv
+        # still exposes their current consolidated version date separately.
+        version_date_nodes = _find_id(tree, "version_date")
+        if len(version_date_nodes) != 1:
+            raise UnknownStructureError(
+                f"UNKNOWN_STRUCTURE: expected one revision selector or #version_date, found {len(version_date_nodes)}"
+            )
+        effective = parse_lv_date(version_date_nodes[0].attrs.get("data-version_date", ""))
+        if effective is None:
+            raise UnknownStructureError("UNKNOWN_STRUCTURE: #version_date has no usable date")
+        revisions[effective] = Revision(law_id=law_id, effective=effective, url=page_url)
     if not revisions:
         raise UnknownStructureError("UNKNOWN_STRUCTURE: revision selector contained no revisions")
     return sorted(revisions.values(), key=lambda revision: revision.effective)

@@ -14,3 +14,4 @@ build/
 
 # Generated law repository must live outside this repository by default.
 latvian-laws/
+latvian-laws-active/

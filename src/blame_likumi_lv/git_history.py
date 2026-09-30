@@ -65,21 +65,60 @@ def build_history(laws: list[Law], revisions_by_law: dict[str, list[Revision]], 
     metadata_by_law = {law.id: _read_metadata(cache_dir, law) for law in laws}
     generated_readme = """# latvian-laws
 
-This repository is generated from official consolidated law snapshots published
-by Likumi.lv. It is intentionally usable with standard Git tools:
+Šis ir no Likumi.lv oficiālajām redakcijām ģenerēts Latvijas tiesību aktu Git
+repozitorijs. Likumi.lv visa šī informācija jau ir pieejama, taču GitHub
+interfeiss ir ērts, pazīstams un ļauj lasīt izmaiņas pa rindām.
+
+Projekta galvenā motivācija ir ļoti praktiska: es gribu noskaidrot, kāds idiots
+izdomāja šo punktu. Ar parasto Git vēsturi var redzēt, kad konkrēta rinda
+parādījās vai mainījās, un atvērt attiecīgās redakcijas oficiālo avotu.
 
 ```bash
-git log -- likumi/<law>.txt
-git diff <old> <new> -- likumi/<law>.txt
-git blame likumi/<law>.txt
+git log -- likumi/<dokuments>.txt
+git diff <old> <new> -- likumi/<dokuments>.txt
+git blame likumi/<dokuments>.txt
+git show <commit>
 ```
 
-The `likumi/` files contain normalized official text only. Provenance and
-document metadata are stored in `metadata/` and in the commit messages.
+`likumi/` faili satur tikai normalizētu oficiālo tekstu. Izcelsmes informācija
+atrodas `metadata/` un Git commit ziņojumos. Šajā datu kopā ir spēkā esošie
+Saeimas likumi un Ministru kabineta noteikumi, neiekļaujot atsevišķus grozījumu
+aktus.
+
+Angļu valodas apraksts: [README_EN.md](README_EN.md).
+
+Avots: https://likumi.lv/
+"""
+    generated_readme_en = """# latvian-laws
+
+This repository is generated from official consolidated Latvian legal-act
+versions published by Likumi.lv. Likumi.lv already provides all of this
+information, but the GitHub interface is familiar and convenient for reading
+changes line by line.
+
+The project's main motivation is very practical: I want to find out which idiot
+came up with a particular paragraph. With an ordinary Git history, it is
+possible to see when a line appeared or changed and open the official source
+for the corresponding version.
+
+```bash
+git log -- likumi/<document>.txt
+git diff <old> <new> -- likumi/<document>.txt
+git blame likumi/<document>.txt
+git show <commit>
+```
+
+Files in `likumi/` contain only normalized official text. Provenance is stored
+in `metadata/` and in Git commit messages. This dataset contains active laws
+from the Saeima and active Cabinet of Ministers regulations, excluding
+standalone amendment acts.
+
+Latviešu valodas apraksts: [README.md](README.md).
 
 Source: https://likumi.lv/
 """
     (output / "README.md").write_text(generated_readme, encoding="utf-8", newline="\n")
+    (output / "README_EN.md").write_text(generated_readme_en, encoding="utf-8", newline="\n")
     grouped: dict[date, list[tuple[Law, Revision]]] = defaultdict(list)
     for law in laws:
         revisions = revisions_by_law.get(law.id, [])
