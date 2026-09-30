@@ -27,7 +27,7 @@ class RateLimitedFetcher:
         return path
 
     def get(self, url: str, cache_path: Path) -> tuple[str, bytes, bool]:
-        if cache_path.exists() and not self.refresh:
+        if cache_path.exists() and not self.refresh and cache_path.stat().st_size > 0:
             raw = cache_path.read_bytes()
             return raw.decode("utf-8"), raw, True
 
@@ -42,6 +42,8 @@ class RateLimitedFetcher:
             try:
                 with urlopen(request, timeout=45) as response:
                     raw = response.read()
+                if not raw.strip():
+                    raise URLError("empty response")
                 self._last_request = time.monotonic()
                 cache_path.write_bytes(raw)
                 return raw.decode("utf-8"), raw, False
