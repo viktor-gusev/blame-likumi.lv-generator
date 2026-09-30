@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+cache/
+dist/
+build/
+*.egg-info/
+.mypy_cache/
+.idea/
+
+# Generated law repository must live outside this repository by default.
+latvian-laws/

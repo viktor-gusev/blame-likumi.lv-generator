@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blame-likumi-lv"
+version = "0.1.0"
+description = "Build deterministic Git histories from official Likumi.lv law snapshots"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+blame-likumi = "blame_likumi_lv.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
