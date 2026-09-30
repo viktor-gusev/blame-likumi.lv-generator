@@ -158,6 +158,19 @@ def parse_metadata(source: str, source_url: str, fallback_id: str, fallback_titl
     if len(body_nodes) != 1:
         raise UnknownStructureError("UNKNOWN_STRUCTURE: expected one passport body")
     fields = [node.text_content() for node in body_nodes[0].descendants() if node.tag == "span"]
+    # Older/international document pages render passport fields as adjacent
+    # property-title/property-val divs instead of the newer span format.
+    passport_nodes = list(body_nodes[0].descendants())
+    for index, node in enumerate(passport_nodes):
+        if not node.has_class("property-title"):
+            continue
+        label = " ".join(node.text_content().split())
+        for candidate in passport_nodes[index + 1:]:
+            if candidate.has_class("property-title"):
+                break
+            if candidate.has_class("property-val"):
+                fields.append(f"{label} {' '.join(candidate.text_content().split())}")
+                break
     combined = " ".join(fields)
 
     def value(label: str) -> str | None:
@@ -170,10 +183,15 @@ def parse_metadata(source: str, source_url: str, fallback_id: str, fallback_titl
 
     title = value("Nosaukums:") or fallback_title
     issuer = value("Izdevējs:")
-    doc_type = (value("Veids:") or fallback_type).lower()
+    actual_type = (value("Veids:") or "").lower()
     expected_type = fallback_type.lower()
-    if doc_type != expected_type:
-        raise UnknownStructureError(f"UNSUPPORTED_TYPE: expected {expected_type}, found {doc_type!r}")
+    if expected_type == "noteikumi" and actual_type and "noteik" not in actual_type:
+        raise UnknownStructureError(f"UNSUPPORTED_TYPE: expected {expected_type}, found {actual_type!r}")
+    if expected_type == "likums" and actual_type and "noteik" in actual_type:
+        raise UnknownStructureError(f"UNSUPPORTED_TYPE: expected {expected_type}, found {actual_type!r}")
+    # The catalog's `likums` category also contains international documents;
+    # retain the catalog type as the stable project-level classification.
+    doc_type = expected_type
 
     published = value("Publicēts:")
     metadata = LawMetadata(
